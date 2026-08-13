@@ -1,16 +1,25 @@
 // markdown of languages
 async function markdownPython(tag) {
     let functions = [];
+    let bools = ['True', 'False', 'None'];
 
     try {
         const response = await fetch("assets/python.txt");
         const text = await response.text();
 
-        functions = text
-            .split("\n")
-            .map(line => line.trim())
-            .filter(line => line !== "")
+        const lines = text.split("\n").map(line => line.trim()).filter(line => line !== "");
+        
+        functions = lines
+            .filter(line => !line.startsWith("#"))
             .map(line => line.replace("()", ""));
+
+        const boolLines = lines.filter(line => line.startsWith("#bool:"));
+        if (boolLines.length > 0) {
+            bools = boolLines[0]
+                .replace("#bool:", "")
+                .split(",")
+                .map(b => b.trim());
+        }
 
     } catch (error) {
         console.error("Error fetching python functions:", error);
@@ -21,27 +30,17 @@ async function markdownPython(tag) {
         throw Error("Cannot find python file assets.");
     }
 
-    // Get the original code
-    const code = tag.textContent;
+    const code = tag.innerText;
 
-    // Escape HTML
     let html = code
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
-    // -------------------------
-    // Highlight strings
-    // -------------------------
-
     html = html.replace(
         /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g,
         `<span style="color: #ce9178;">$1</span>`
     );
-
-    // -------------------------
-    // Highlight Python functions
-    // -------------------------
 
     const escapedFunctions = functions.map(
         name => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -57,10 +56,133 @@ async function markdownPython(tag) {
         `<span style="color: #ffd700;">$1</span>`
     );
 
+    const escapedBools = bools.map(
+        name => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    );
+
+    const boolRegex = new RegExp(
+        `\\b(${escapedBools.join("|")})\\b`,
+        "g"
+    );
+
+    html = html.replace(
+        boolRegex,
+        `<span style="color: #569cd6;">$1</span>`
+    );
+
     tag.innerHTML = html;
 }
 
+async function markdownHtml(tag) {
+    let data = [];
 
+    try {
+        const response = await fetch("assets/html_tags.txt");
+        const text = await response.text();
+
+        data = text
+            .split("\n")
+            .map(line => line.trim())
+            .filter(line => line !== "");
+
+    } catch (error) {
+        console.error("Error fetching html tags:", error);
+        return;
+    }
+
+    if (data.length === 0) {
+        throw Error("Cannot find html file assets.");
+    }
+
+    // Get original code
+    const code = tag.textContent;
+
+    // Escape HTML
+    const escapeHtml = text => {
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+    };
+
+    const escapedTags = data.map(
+        name => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    );
+
+    const tagNames = escapedTags.join("|");
+
+    // Find complete HTML tags
+    const tagRegex = new RegExp(
+        `<\\/?(?:${tagNames})(?:\\s+[^<>]*?)?\\s*\\/?>`,
+        "g"
+    );
+
+    let result = "";
+    let lastIndex = 0;
+
+    for (const match of code.matchAll(tagRegex)) {
+        const index = match.index;
+        const originalTag = match[0];
+
+        // Normal text before the tag
+        result += escapeHtml(
+            code.slice(lastIndex, index)
+        );
+
+        // -------------------------
+        // Process HTML tag
+        // -------------------------
+
+        const isClosing = originalTag.startsWith("</");
+        const isSelfClosing = originalTag.endsWith("/>");
+
+        const nameMatch = originalTag.match(
+            new RegExp(`^<\\/?(${tagNames})`)
+        );
+
+        if (!nameMatch) {
+            result += escapeHtml(originalTag);
+            lastIndex = index + originalTag.length;
+            continue;
+        }
+
+        const tagName = nameMatch[1];
+
+        // Everything after tag name
+        let attributes = originalTag.slice(
+            nameMatch[0].length
+        );
+
+        // Escape attributes
+        attributes = escapeHtml(attributes);
+
+        // Highlight attributes
+        attributes = attributes.replace(
+            /\b([a-zA-Z_:][\w:.-]*)(?=\s*=)/g,
+            `<span style="color: #9cdcfe;">$1</span>`
+        );
+
+        // Highlight attribute values
+        attributes = attributes.replace(
+            /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g,
+            `<span style="color: #ce9178;">$1</span>`
+        );
+
+        // Build final tag
+        result += isClosing
+            ? `&lt;/<span style="color: #569cd6;">${tagName}</span>${attributes}`
+            : `&lt;<span style="color: #569cd6;">${tagName}</span>${attributes}`;
+
+        lastIndex = index + originalTag.length;
+    }
+
+    // Remaining text
+    result += escapeHtml(
+        code.slice(lastIndex)
+    );
+
+    tag.innerHTML = result;
+}
 
 
 
@@ -194,6 +316,9 @@ function markdown(className, idName, theme="dark") {
     // highlight Python
     if (langMatch && langMatch[1] === "python") {
         markdownPython(content);
+    }
+    else if (langMatch && langMatch[1] === "html") {
+        markdownHtml(content);
     }
 
     // append everything

@@ -94,10 +94,8 @@ async function markdownHtml(tag) {
         throw Error("Cannot find html file assets.");
     }
 
-    // Get original code
     const code = tag.textContent;
 
-    // Escape HTML
     const escapeHtml = text => {
         return text
             .replace(/&/g, "&amp;")
@@ -111,7 +109,6 @@ async function markdownHtml(tag) {
 
     const tagNames = escapedTags.join("|");
 
-    // Find complete HTML tags
     const tagRegex = new RegExp(
         `<\\/?(?:${tagNames})(?:\\s+[^<>]*?)?\\s*\\/?>`,
         "g"
@@ -124,14 +121,9 @@ async function markdownHtml(tag) {
         const index = match.index;
         const originalTag = match[0];
 
-        // Normal text before the tag
         result += escapeHtml(
             code.slice(lastIndex, index)
         );
-
-        // -------------------------
-        // Process HTML tag
-        // -------------------------
 
         const isClosing = originalTag.startsWith("</");
         const isSelfClosing = originalTag.endsWith("/>");
@@ -148,27 +140,22 @@ async function markdownHtml(tag) {
 
         const tagName = nameMatch[1];
 
-        // Everything after tag name
         let attributes = originalTag.slice(
             nameMatch[0].length
         );
 
-        // Escape attributes
         attributes = escapeHtml(attributes);
 
-        // Highlight attributes
         attributes = attributes.replace(
             /\b([a-zA-Z_:][\w:.-]*)(?=\s*=)/g,
             `<span style="color: #9cdcfe;">$1</span>`
         );
 
-        // Highlight attribute values
         attributes = attributes.replace(
             /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g,
             `<span style="color: #ce9178;">$1</span>`
         );
 
-        // Build final tag
         result += isClosing
             ? `&lt;/<span style="color: #569cd6;">${tagName}</span>${attributes}`
             : `&lt;<span style="color: #569cd6;">${tagName}</span>${attributes}`;
@@ -176,7 +163,243 @@ async function markdownHtml(tag) {
         lastIndex = index + originalTag.length;
     }
 
-    // Remaining text
+    result += escapeHtml(
+        code.slice(lastIndex)
+    );
+
+    tag.innerHTML = result;
+}
+
+async function markdownCss(tag) {
+    let properties = [];
+
+    try {
+        const response = await fetch("assets/css_properties.txt");
+        const text = await response.text();
+
+        properties = text
+            .split("\n")
+            .map(line => line.trim())
+            .filter(line => line !== "");
+
+    } catch (error) {
+        console.error("Error fetching CSS properties:", error);
+        return;
+    }
+
+    if (properties.length === 0) {
+        throw Error("Cannot find CSS properties file.");
+    }
+
+    const code = tag.textContent;
+
+    function escapeHtml(text) {
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+    }
+
+    function escapeRegex(text) {
+        return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    const propertyList = properties
+        .map(escapeRegex)
+        .join("|");
+
+    const blockRegex = /([^{}]+)\{([^{}]*)\}/g;
+
+    let result = "";
+    let lastIndex = 0;
+
+    for (const match of code.matchAll(blockRegex)) {
+        const selector = match[1];
+        const body = match[2];
+        const index = match.index;
+
+        // Text before block
+        result += escapeHtml(
+            code.slice(lastIndex, index)
+        );
+
+        // --------------------------------
+        // Selector
+        // --------------------------------
+
+        result += escapeHtml(selector);
+
+        result += `<span style="color: #d4d4d4;">{</span>`;
+
+        // --------------------------------
+        // Process declarations
+        // --------------------------------
+
+        const declarationRegex =
+            /([^:;]+):([^;]+);?/g;
+
+        let bodyResult = "";
+        let bodyLastIndex = 0;
+
+        for (const declaration of body.matchAll(declarationRegex)) {
+            const property = declaration[1];
+            const value = declaration[2];
+            const fullMatch = declaration[0];
+
+            const declarationIndex = declaration.index;
+
+            // Text before declaration
+            bodyResult += escapeHtml(
+                body.slice(bodyLastIndex, declarationIndex)
+            );
+
+            // Property
+            const cleanProperty = property.trim();
+
+            const propertyMatch = new RegExp(
+                `^(${propertyList})$`
+            ).test(cleanProperty);
+
+            if (propertyMatch) {
+                bodyResult += escapeHtml(
+                    property.slice(0, property.indexOf(cleanProperty))
+                );
+
+                bodyResult +=
+                    `<span style="color: #9cdcfe;">${escapeHtml(cleanProperty)}</span>`;
+            } else {
+                bodyResult += escapeHtml(property);
+            }
+
+            // Colon
+            bodyResult += ":";
+
+            // --------------------------------
+            // Value
+            // --------------------------------
+
+            let valueHtml = escapeHtml(value);
+
+            // Strings
+            const strings = [];
+
+            valueHtml = valueHtml.replace(
+                /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g,
+                match => {
+                    const id = strings.length;
+
+                    strings.push(
+                        `<span style="color: #ce9178;">${match}</span>`
+                    );
+
+                    return `___STRING_${id}___`;
+                }
+            );
+
+            // Hex colors
+            const colors = [];
+
+            valueHtml = valueHtml.replace(
+                /#[0-9a-fA-F]{3,8}\b/g,
+                match => {
+                    const id = colors.length;
+
+                    colors.push(
+                        `<span style="color: #b5cea8;">${match}</span>`
+                    );
+
+                    return `___COLOR_${id}___`;
+                }
+            );
+
+            // Numbers + units
+            const numbers = [];
+
+            valueHtml = valueHtml.replace(
+                /(?<![\w-])\d+(?:\.\d+)?(?:px|em|rem|%|vh|vw|vmin|vmax|s|ms|deg)?\b/g,
+                match => {
+                    const id = numbers.length;
+
+                    numbers.push(
+                        `<span style="color: #b5cea8;">${match}</span>`
+                    );
+
+                    return `___NUMBER_${id}___`;
+                }
+            );
+
+            // !important
+            const important = [];
+
+            valueHtml = valueHtml.replace(
+                /!important\b/g,
+                match => {
+                    const id = important.length;
+
+                    important.push(
+                        `<span style="color: #c586c0;">${match}</span>`
+                    );
+
+                    return `___IMPORTANT_${id}___`;
+                }
+            );
+
+            // Restore strings
+            strings.forEach((value, id) => {
+                valueHtml = valueHtml.replace(
+                    `___STRING_${id}___`,
+                    value
+                );
+            });
+
+            // Restore colors
+            colors.forEach((value, id) => {
+                valueHtml = valueHtml.replace(
+                    `___COLOR_${id}___`,
+                    value
+                );
+            });
+
+            // Restore numbers
+            numbers.forEach((value, id) => {
+                valueHtml = valueHtml.replace(
+                    `___NUMBER_${id}___`,
+                    value
+                );
+            });
+
+            // Restore !important
+            important.forEach((value, id) => {
+                valueHtml = valueHtml.replace(
+                    `___IMPORTANT_${id}___`,
+                    value
+                );
+            });
+
+            bodyResult += valueHtml;
+
+            // Semicolon
+            if (fullMatch.endsWith(";")) {
+                bodyResult += ";";
+            }
+
+            bodyLastIndex =
+                declarationIndex + fullMatch.length;
+        }
+
+        // Remaining body
+        bodyResult += escapeHtml(
+            body.slice(bodyLastIndex)
+        );
+
+        result += bodyResult;
+
+        result += `<span style="color: #d4d4d4;">}</span>`;
+
+        lastIndex = index + match[0].length;
+    }
+
+    // Remaining code
     result += escapeHtml(
         code.slice(lastIndex)
     );
@@ -273,10 +496,14 @@ function markdown(className, idName, theme="dark") {
     // create content area for markdown
     let content = document.createElement("div");
     content.className = "content";
+
     content.style.width = "100%";
     content.style.padding = "20px";
-    content.style.boxSizing = "border-box";
     content.style.margin = "0";
+    content.style.boxSizing = "border-box";
+
+    content.style.setProperty("white-space", "pre-wrap", "important");
+    content.style.setProperty("text-align", "left", "important");
     
     // set theme
     if (theme === "dark") {
@@ -304,21 +531,43 @@ function markdown(className, idName, theme="dark") {
     if (langMatch) {
         titleText.innerText = langMatch[1];
 
-        displayContent = markdownContent.replace(/```\w+\n/, "");
-        displayContent = displayContent.replaceAll("```", "");
-    } else {
-        displayContent = markdownContent.replaceAll("```", "");
+        displayContent = markdownContent.replace(
+            /```\w+\n/,
+            ""
+        );
+
+        displayContent = displayContent.replaceAll(
+            "```",
+            ""
+        );
+    }
+    else {
+        displayContent = markdownContent.replaceAll(
+            "```",
+            ""
+        );
     }
 
-    // add content to the content area
-    content.innerText = displayContent;
+    // Add original text
+    content.textContent = displayContent;
 
-    // highlight Python
-    if (langMatch && langMatch[1] === "python") {
-        markdownPython(content);
-    }
-    else if (langMatch && langMatch[1] === "html") {
-        markdownHtml(content);
+    // Preserve formatting
+    content.style.whiteSpace = "pre-wrap";
+
+    // Highlight
+    if (langMatch) {
+
+        if (langMatch[1] === "python") {
+            markdownPython(content);
+        }
+
+        else if (langMatch[1] === "html") {
+            markdownHtml(content);
+        }
+
+        else if (langMatch[1] === "css") {
+            markdownCss(content);
+        }
     }
 
     // append everything

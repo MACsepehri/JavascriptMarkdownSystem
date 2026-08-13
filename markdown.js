@@ -1,3 +1,14 @@
+// Created by MACsepehri Copyright 2026
+// more info at github : https://github.com/MACsepehri/JavascriptMarkdownSystem
+// Here there are comments for getting more info of what does each part do.
+
+
+
+
+
+
+
+
 // markdown of languages
 async function markdownPython(tag) {
     let functions = [];

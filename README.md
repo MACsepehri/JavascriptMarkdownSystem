@@ -10,7 +10,6 @@ javascript codes.
 # Usage
 <h2>The most easy way to use markdown :</h2>
 <pre>
-
     <div class="my-code">
         ```
             <!-- something here ... -->
@@ -18,7 +17,8 @@ javascript codes.
     </div>
 
     <!-- Link the markdown.js into your code -->
-    <script>
+    <script type="module">
+        import markdown from '/markdown.js'
         markdown(className="my-code", idName=""); // you need to give className or idName for selection.
     </script>
 </pre>

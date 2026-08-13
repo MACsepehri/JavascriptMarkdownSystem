@@ -1,3 +1,72 @@
+// markdown of languages
+async function markdownPython(tag) {
+    let functions = [];
+
+    try {
+        const response = await fetch("assets/python.txt");
+        const text = await response.text();
+
+        functions = text
+            .split("\n")
+            .map(line => line.trim())
+            .filter(line => line !== "")
+            .map(line => line.replace("()", ""));
+
+    } catch (error) {
+        console.error("Error fetching python functions:", error);
+        return;
+    }
+
+    if (functions.length === 0) {
+        throw Error("Cannot find python file assets.");
+    }
+
+    // Get the original code
+    const code = tag.textContent;
+
+    // Escape HTML
+    let html = code
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    // -------------------------
+    // Highlight strings
+    // -------------------------
+
+    html = html.replace(
+        /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g,
+        `<span style="color: #ce9178;">$1</span>`
+    );
+
+    // -------------------------
+    // Highlight Python functions
+    // -------------------------
+
+    const escapedFunctions = functions.map(
+        name => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    );
+
+    const functionRegex = new RegExp(
+        `\\b(${escapedFunctions.join("|")})\\b(?=\\s*\\()`,
+        "g"
+    );
+
+    html = html.replace(
+        functionRegex,
+        `<span style="color: #ffd700;">$1</span>`
+    );
+
+    tag.innerHTML = html;
+}
+
+
+
+
+
+
+
+
 function copyText(text) {
     try {
         navigator.clipboard.writeText(text);
@@ -73,7 +142,7 @@ function markdown(className, idName, theme="dark") {
     image.style.cursor = "pointer";
     image.style.display = "block";
     image.style.marginRight = "40px";
-    image.onclick = function() { copyText(box.innerText.replace("Code Preview", "")); };
+    image.onclick = function() { copyText(content.innerText); };
     rightSection.appendChild(image);
     
     header.appendChild(leftSection);
@@ -105,8 +174,27 @@ function markdown(className, idName, theme="dark") {
         header.style.borderBottom = "1px solid #ddd";
     }
 
-    // add content to the content area (not the container)
-    content.innerText = markdownContent.replace(/```/g, "");
+    // detect language and remove it from content
+    let displayContent = markdownContent;
+
+    const langMatch = markdownContent.match(/```(\w+)\n/);
+
+    if (langMatch) {
+        titleText.innerText = langMatch[1];
+
+        displayContent = markdownContent.replace(/```\w+\n/, "");
+        displayContent = displayContent.replaceAll("```", "");
+    } else {
+        displayContent = markdownContent.replaceAll("```", "");
+    }
+
+    // add content to the content area
+    content.innerText = displayContent;
+
+    // highlight Python
+    if (langMatch && langMatch[1] === "python") {
+        markdownPython(content);
+    }
 
     // append everything
     container.appendChild(header);

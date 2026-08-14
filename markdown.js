@@ -8,6 +8,84 @@
 
 
 
+// show lines
+function showLines() {
+    const contentDivs = document.querySelectorAll('.content');
+    
+    contentDivs.forEach(contentDiv => {
+        const container = contentDiv.parentElement;
+        if (!container) return;
+        
+        if (container.querySelector('.line-numbers')) return;
+        
+        const codeText = contentDiv.textContent;
+        const lines = codeText.split('\n');
+        
+        const lineNumbersDiv = document.createElement('div');
+        lineNumbersDiv.className = 'line-numbers';
+        lineNumbersDiv.style.cssText = `
+            position: absolute;
+            left: 0;
+            top: 40px;
+            padding: 20px 10px;
+            text-align: right;
+            user-select: none;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            min-width: 45px;
+            background-color: rgba(0, 0, 0, 0.05);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            height: auto;
+            overflow: hidden;
+            box-sizing: border-box;
+            pointer-events: none;
+            z-index: 1;
+        `;
+        
+        lines.forEach((_, index) => {
+            const lineNum = document.createElement('div');
+            lineNum.textContent = index + 1;
+            lineNum.style.cssText = `
+                color: #858585;
+                font-size: 14px;
+                line-height: 1.6;
+                padding: 0 5px;
+                font-family: 'Courier New', monospace;
+                white-space: nowrap;
+            `;
+            lineNumbersDiv.appendChild(lineNum);
+        });
+        
+        // Make container position relative for absolute positioning
+        container.style.position = 'relative';
+        container.style.paddingLeft = '60px';
+        
+        // Insert line numbers before content
+        container.insertBefore(lineNumbersDiv, contentDiv);
+        
+        // Adjust content padding
+        contentDiv.style.paddingLeft = '0';
+        contentDiv.style.marginLeft = '0';
+        contentDiv.style.marginTop = '0'; // Remove margin-top
+        
+        // Adjust header
+        const header = container.querySelector('.header');
+        if (header) {
+            header.style.position = 'relative'; // Change from absolute to relative
+            header.style.left = '0';
+            header.style.paddingLeft = '60px';
+            header.style.width = 'calc(100% - 60px)';
+            header.style.boxSizing = 'border-box';
+        }
+        
+        // Sync scroll
+        contentDiv.addEventListener('scroll', function() {
+            lineNumbersDiv.scrollTop = this.scrollTop;
+        });
+    });
+}
+
 
 // markdown of languages
 async function markdownPython(tag) {
@@ -229,22 +307,13 @@ async function markdownCss(tag) {
         const body = match[2];
         const index = match.index;
 
-        // Text before block
         result += escapeHtml(
             code.slice(lastIndex, index)
         );
 
-        // --------------------------------
-        // Selector
-        // --------------------------------
-
         result += escapeHtml(selector);
 
         result += `<span style="color: #d4d4d4;">{</span>`;
-
-        // --------------------------------
-        // Process declarations
-        // --------------------------------
 
         const declarationRegex =
             /([^:;]+):([^;]+);?/g;
@@ -259,12 +328,9 @@ async function markdownCss(tag) {
 
             const declarationIndex = declaration.index;
 
-            // Text before declaration
             bodyResult += escapeHtml(
                 body.slice(bodyLastIndex, declarationIndex)
             );
-
-            // Property
             const cleanProperty = property.trim();
 
             const propertyMatch = new RegExp(
@@ -282,16 +348,10 @@ async function markdownCss(tag) {
                 bodyResult += escapeHtml(property);
             }
 
-            // Colon
             bodyResult += ":";
-
-            // --------------------------------
-            // Value
-            // --------------------------------
 
             let valueHtml = escapeHtml(value);
 
-            // Strings
             const strings = [];
 
             valueHtml = valueHtml.replace(
@@ -307,7 +367,6 @@ async function markdownCss(tag) {
                 }
             );
 
-            // Hex colors
             const colors = [];
 
             valueHtml = valueHtml.replace(
@@ -323,7 +382,6 @@ async function markdownCss(tag) {
                 }
             );
 
-            // Numbers + units
             const numbers = [];
 
             valueHtml = valueHtml.replace(
@@ -339,7 +397,6 @@ async function markdownCss(tag) {
                 }
             );
 
-            // !important
             const important = [];
 
             valueHtml = valueHtml.replace(
@@ -355,7 +412,6 @@ async function markdownCss(tag) {
                 }
             );
 
-            // Restore strings
             strings.forEach((value, id) => {
                 valueHtml = valueHtml.replace(
                     `___STRING_${id}___`,
@@ -363,7 +419,6 @@ async function markdownCss(tag) {
                 );
             });
 
-            // Restore colors
             colors.forEach((value, id) => {
                 valueHtml = valueHtml.replace(
                     `___COLOR_${id}___`,
@@ -371,7 +426,6 @@ async function markdownCss(tag) {
                 );
             });
 
-            // Restore numbers
             numbers.forEach((value, id) => {
                 valueHtml = valueHtml.replace(
                     `___NUMBER_${id}___`,
@@ -379,7 +433,6 @@ async function markdownCss(tag) {
                 );
             });
 
-            // Restore !important
             important.forEach((value, id) => {
                 valueHtml = valueHtml.replace(
                     `___IMPORTANT_${id}___`,
@@ -389,7 +442,6 @@ async function markdownCss(tag) {
 
             bodyResult += valueHtml;
 
-            // Semicolon
             if (fullMatch.endsWith(";")) {
                 bodyResult += ";";
             }
@@ -398,7 +450,6 @@ async function markdownCss(tag) {
                 declarationIndex + fullMatch.length;
         }
 
-        // Remaining body
         bodyResult += escapeHtml(
             body.slice(bodyLastIndex)
         );
@@ -410,7 +461,6 @@ async function markdownCss(tag) {
         lastIndex = index + match[0].length;
     }
 
-    // Remaining code
     result += escapeHtml(
         code.slice(lastIndex)
     );
@@ -510,11 +560,18 @@ function markdown(className, idName, theme="dark") {
 
     content.style.width = "100%";
     content.style.padding = "20px";
-    content.style.margin = "0";
     content.style.boxSizing = "border-box";
+    content.style.position = "absolute";
+    content.style.top = "45px";
 
     content.style.setProperty("white-space", "pre-wrap", "important");
     content.style.setProperty("text-align", "left", "important");
+    
+    container.style.paddingLeft = '60px';
+    header.style.paddingLeft = '60px';
+    header.style.width = 'calc(100% - 60px)';
+    header.style.position = "absolute";
+    header.style.left = "0";
     
     // set theme
     if (theme === "dark") {
@@ -585,6 +642,7 @@ function markdown(className, idName, theme="dark") {
     container.appendChild(header);
     container.appendChild(content);
     box.appendChild(container);
+    showLines();
 }
 
 export default markdown;

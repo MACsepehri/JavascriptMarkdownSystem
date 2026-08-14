@@ -23,3 +23,15 @@ javascript codes.
     </script>
 </pre>
 Or you can replace ``` for starting with ```Your-Coding-Lang to make it colorfull.
+
+# Images
+Here there is some images of the markdown :
+<img src="/images/dark.png" alt="Dark-CSS-Markdown">
+
+# Languages
+Here there is the languages that this markdown supports :
+<li>
+    <ul>Python</ul>
+    <ul>Html</ul>
+    <ul>Css</ul>
+</li>

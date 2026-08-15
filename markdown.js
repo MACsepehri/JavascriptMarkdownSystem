@@ -4,6 +4,11 @@
 
 
 
+// assets path
+let python_txt = "assets/python.txt"
+let html_tags = "assets/html_tags.txt"
+let css_properties = "assets/css_properties.txt"
+
 
 
 
@@ -57,29 +62,24 @@ function showLines() {
             lineNumbersDiv.appendChild(lineNum);
         });
         
-        // Make container position relative for absolute positioning
         container.style.position = 'relative';
         container.style.paddingLeft = '60px';
         
-        // Insert line numbers before content
         container.insertBefore(lineNumbersDiv, contentDiv);
         
-        // Adjust content padding
         contentDiv.style.paddingLeft = '0';
         contentDiv.style.marginLeft = '0';
-        contentDiv.style.marginTop = '0'; // Remove margin-top
+        contentDiv.style.marginTop = '0';
         
-        // Adjust header
         const header = container.querySelector('.header');
         if (header) {
-            header.style.position = 'relative'; // Change from absolute to relative
+            header.style.position = 'relative';
             header.style.left = '0';
             header.style.paddingLeft = '60px';
             header.style.width = 'calc(100% - 60px)';
             header.style.boxSizing = 'border-box';
         }
         
-        // Sync scroll
         contentDiv.addEventListener('scroll', function() {
             lineNumbersDiv.scrollTop = this.scrollTop;
         });
@@ -93,7 +93,7 @@ async function markdownPython(tag) {
     let bools = ['True', 'False', 'None'];
 
     try {
-        const response = await fetch("assets/python.txt");
+        const response = await fetch(python_txt);
         const text = await response.text();
 
         const lines = text.split("\n").map(line => line.trim()).filter(line => line !== "");
@@ -166,7 +166,7 @@ async function markdownHtml(tag) {
     let data = [];
 
     try {
-        const response = await fetch("assets/html_tags.txt");
+        const response = await fetch(html_tags);
         const text = await response.text();
 
         data = text
@@ -263,7 +263,7 @@ async function markdownCss(tag) {
     let properties = [];
 
     try {
-        const response = await fetch("assets/css_properties.txt");
+        const response = await fetch(css_properties);
         const text = await response.text();
 
         properties = text
